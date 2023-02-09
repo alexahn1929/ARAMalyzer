@@ -3,6 +3,7 @@
     "@types/node": "^18.11.19"
   },
   "dependencies": {
+    "@fightmegg/riot-api": "^0.0.8",
     "dotenv": "^16.0.3"
   }
 }
