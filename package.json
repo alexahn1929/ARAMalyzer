@@ -4,6 +4,7 @@
   },
   "dependencies": {
     "@fightmegg/riot-api": "^0.0.8",
+    "bottleneck": "^2.19.5",
     "dotenv": "^16.0.3"
   }
 }

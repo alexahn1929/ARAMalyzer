@@ -1,8 +1,9 @@
 import https = require('node:https');
 require('dotenv').config();
-import { RiotAPITypes} from '@fightmegg/riot-api/dist/cjs/@types/index';
+import { RiotAPITypes } from '@fightmegg/riot-api/dist/cjs/@types/index';
 import querystring = require('node:querystring');
 import path_to_regexp = require('path-to-regexp');
+import Bottleneck from "bottleneck";
 
 const API_KEY = process.env.API_KEY;
 const PLATFORM = 'na1';
@@ -82,12 +83,62 @@ function getMatch(matchId:string): Promise<RiotAPITypes.Match.MatchDTO> {
     return makeRequest(options).then((obj) => obj as RiotAPITypes.Match.MatchDTO);
 }
 
+/* DEBUG:
 let sm = getSummoner('agoofygoober');
 sm.then((out) => {
     console.log(out);
-    let mts = getMatchIds(out.puuid, {queue: 0, start: 0, count: 3,});
+    let mts = getMatchIds(out.puuid, {queue: 450, start: 0, count: 3,});
     mts.then((out2) => {
         console.log(out2);
         out2.forEach((id) => getMatch(id).then((match) => console.log(match)));
     })
-});
+});*/
+
+
+class RateLimit {
+    public res:number;
+    public interval:number;
+
+    constructor(rl:string) {
+        let data = rl.split(":");
+        this.res = Number(data[0]);
+        this.interval = Number(data[1]);
+    }
+}
+
+function makeBottleneck(maxConcurrent:number, minTime:number, rl:RateLimit):Bottleneck {
+    return new Bottleneck({
+        maxConcurrent,
+        minTime,
+        reservoir: rl.res,
+        reservoirRefreshAmount: rl.res,
+        reservoirRefreshInterval: rl.interval,
+    });
+}
+
+const APP_LIMIT_1 = new RateLimit("20:1");
+const APP_LIMIT_2 = new RateLimit("100:120");
+const METHOD_LIMIT_MATCH = new RateLimit("2000:10");
+const METHOD_LIMIT_SUMMONER = new RateLimit("2000:60");
+const MAX_CONCURRENT = 1;
+const MIN_TIME = 50;
+
+async function setReservoir(lim:Bottleneck, val:number):Promise<void> {
+    let curRes = await lim.currentReservoir();
+    if (typeof curRes === 'number') {
+        await lim.incrementReservoir(val - curRes);
+        console.log(`reservoir incremented from ${curRes} to ${await lim.currentReservoir()}`)
+    }
+}
+
+
+const appLimiter1 = makeBottleneck(MAX_CONCURRENT, MIN_TIME, APP_LIMIT_1);
+const appLimiter2 = makeBottleneck(MAX_CONCURRENT, MIN_TIME, APP_LIMIT_2);
+const summonerLimiter = makeBottleneck(MAX_CONCURRENT, MIN_TIME, METHOD_LIMIT_SUMMONER);
+const matchLimiter = makeBottleneck(MAX_CONCURRENT, MIN_TIME, METHOD_LIMIT_MATCH);
+
+const ARAM_QUEUE_ID = 450;
+
+appLimiter2.chain(appLimiter1);
+summonerLimiter.chain(appLimiter2);
+matchLimiter.chain(appLimiter2);
