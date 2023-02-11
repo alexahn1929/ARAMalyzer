@@ -8,7 +8,18 @@ const renderTable = pug.compileFile('table.pug')
 const PATCH = '13.1.1';
 const LANG = 'en_US'
 
-class ChampData {
+//assumes that the datadragon.tgz corresponding to version specified in PATCH has been unzipped into ./resources
+export function getChampNames():string[] {
+    let champJson = JSON.parse(fs.readFileSync(`./resources/${PATCH}/data/${LANG}/champion.json`, {encoding: 'utf8'}));
+    let champNames:string[] = [];
+    for (const key in champJson.data) {
+        champNames.push(key); //gives MonkeyKing -- matchdto represents MF as "MissFortune"
+        //champNames.push(champJson.data[key].name); //gives Wukong
+    }
+    return champNames;
+}
+
+export class ChampData {
     public winsFor:number = 0;
     public lossesFor:number = 0;
     public gamesFor:number = 0;
@@ -51,18 +62,7 @@ class ChampData {
     }
 }
 
-//assumes that the datadragon.tgz corresponding to version specified in PATCH has been unzipped into ./resources
-function getChampNames():string[] {
-    let champJson = JSON.parse(fs.readFileSync(`./resources/${PATCH}/data/${LANG}/champion.json`, {encoding: 'utf8'}));
-    let champNames:string[] = [];
-    for (const key in champJson.data) {
-        champNames.push(key); //gives MonkeyKing -- matchdto represents MF as "MissFortune"
-        //champNames.push(champJson.data[key].name); //gives Wukong
-    }
-    return champNames;
-}
-
-class WinrateTable {
+export class WinrateTable {
     puuid:string;
     table:{[key:string]:ChampData} = {};
     constructor(champNames:string[], puuid:string) {
@@ -118,6 +118,8 @@ class WinrateTable {
     }
 }
 
+
+/* DEBUG
 let puuid = 'QFhlRvMYTzY6mo7AGbKEqSVVlQIAlenq7BcmDrCn9cNdK1vqYYvTlYiJMjGWBoe3JYA9Ljhc-klxHg';
 let champNames = getChampNames();
 //console.log(champNames);
@@ -141,5 +143,5 @@ for (const file of gf_new) {
     fs.writeFileSync(`./gamedata/${path.parse(file).name}_parsed.json`, JSON.stringify(testTable.table));
 }
 testTable.computeTable();
-
+*/
 

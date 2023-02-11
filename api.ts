@@ -5,10 +5,12 @@ import querystring = require('node:querystring');
 import path_to_regexp = require('path-to-regexp');
 import Bottleneck from "bottleneck";
 import fs = require('node:fs');
+import { ChampData, WinrateTable, getChampNames } from './gamedata';
 
 const API_KEY = process.env.API_KEY;
 const PLATFORM = 'na1';
 const REGION = 'americas';
+const champNames = getChampNames();
 
 const toHostname = path_to_regexp.compile(':domain.api.riotgames.com');
 const summonerPath:string = '/lol/summoner/v4/summoners/by-name/:name';
@@ -161,20 +163,27 @@ function exportMatch(match:RiotAPITypes.MatchV5.MatchDTO) {
     fs.writeFileSync(`./gamedata/${matchId}.json`, json);
 }
 
-async function getAllMatches(puuid:string) { //:Promise<string[]>
+//rename to analyzeMatches later?
+async function getAllMatches(puuid:string) { //:Promise<string>, for table?
     //note: couldn't get this to work using matchLimiter.submit (callback method)
     //also works using wrap
-
-    matchLimiter.schedule(getMatchIds, puuid, {queue: ARAM_QUEUE_ID, count: 3,}).then((ids) => {
+    let playerData = new WinrateTable(champNames, puuid);
+    let hasMatches = true;
+    await matchLimiter.schedule(getMatchIds, puuid, {queue: ARAM_QUEUE_ID, count: 3,}).then((ids) => {
         console.log(ids);
-        ids.forEach((id) => {
-            matchLimiter.schedule(getMatch, id).then(x => {
-                console.log(x)
-                exportMatch(x);
+
+        if (ids.length === 0) {
+            hasMatches = false;
+        }
+        return Promise.all(ids.map(async (id) => {
+            await matchLimiter.schedule(getMatch, id).then((game) => {
+                console.log(game);
+                //exportMatch(game);
+                playerData.logGame(game);
             });
-        });
+        }));
     });
-    
+    playerData.computeTable();
 
     /*mts.then((out2) => {
         console.log(out2);
