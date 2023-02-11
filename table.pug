@@ -1,0 +1,11 @@
+- let propertyNames = ['winsFor', 'lossesFor', 'gamesFor', 'winrateFor', 'winsAgainst', 'lossesAgainst', 'gamesAgainst', 'winrateAgainst', 'winsTotal', 'lossesTotal', 'gamesTotal', 'winrateTotal']
+table 
+    tr 
+        th #{'champion'}
+        each param in propertyNames 
+            th #{param}
+    each value, key in data
+        tr 
+            td #{key}
+            each param in propertyNames
+                td #{value[param]}

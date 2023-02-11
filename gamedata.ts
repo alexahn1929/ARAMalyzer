@@ -1,6 +1,9 @@
 import { RiotAPITypes } from '@fightmegg/riot-api/dist/cjs/@types/index';
 import fs = require('node:fs');
 import path = require('node:path');
+import pug = require('pug');
+
+const renderTable = pug.compileFile('table.pug')
 
 const PATCH = '13.1.1';
 const LANG = 'en_US'
@@ -111,6 +114,7 @@ class WinrateTable {
         for (const champ in this.table) {
             this.table[champ].calculate();
         }
+        fs.writeFileSync(`./tables/table${Date.now()}.html`, renderTable({data: this.table}));
     }
 }
 
@@ -136,3 +140,6 @@ for (const file of gf_new) {
     testTable.logGame(game);
     fs.writeFileSync(`./gamedata/${path.parse(file).name}_parsed.json`, JSON.stringify(testTable.table));
 }
+testTable.computeTable();
+
+
