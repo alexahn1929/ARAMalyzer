@@ -4,6 +4,7 @@ import { RiotAPITypes } from '@fightmegg/riot-api/dist/cjs/@types/index';
 import querystring = require('node:querystring');
 import path_to_regexp = require('path-to-regexp');
 import Bottleneck from "bottleneck";
+import fs = require('node:fs');
 
 const API_KEY = process.env.API_KEY;
 const PLATFORM = 'na1';
@@ -24,17 +25,20 @@ let options:https.RequestOptions = {
 
 
 function makeRequest(opts:https.RequestOptions):Promise<object> {
+    // DEBUG
+    console.log(opts);
+
     return new Promise((resolve, reject) => {
         const request = https.request(opts, (res) => {
-            /* DEBUG:
+            /* DEBUG: */
             console.log('statusCode:', res.statusCode);
-            console.log('headers:', res.headers);
-            res.on('data', (d) => {
+            console.log('headers:', res.headers, '\n');
+            /*res.on('data', (d) => {
                 process.stdout.write(d);
             }); */
 
             if (typeof res.statusCode !== 'undefined' && (res.statusCode < 200 || res.statusCode >= 300)) {
-                //console.log(new Error('statusCode=' + res.statusCode));
+                console.log(new Error('statusCode=' + res.statusCode));
                 return reject(new Error('statusCode=' + res.statusCode));
             }
             
@@ -48,7 +52,7 @@ function makeRequest(opts:https.RequestOptions):Promise<object> {
         });
 
         request.on('error', (error) => {
-            //console.error('Error:', error);
+            console.error('Error:', error);
             reject(error);
         })
         request.end();
@@ -70,17 +74,17 @@ function getMatchIds(puuid:string, params?:querystring.ParsedUrlQueryInput): Pro
     if (typeof params !== 'undefined') {
         options.path += `?${querystring.encode(params)}`;
     }
-    console.log(options);
+    //console.log(options);
 
     return makeRequest(options).then((obj) => obj as string[]);
 }
 
-function getMatch(matchId:string): Promise<RiotAPITypes.Match.MatchDTO> {
+function getMatch(matchId:string): Promise<RiotAPITypes.MatchV5.MatchDTO> {
     const toPath = path_to_regexp.compile(matchIdPath, {encode: encodeURIComponent});
     options.host = toHostname({domain:REGION});
     options.path = toPath({matchId});
 
-    return makeRequest(options).then((obj) => obj as RiotAPITypes.Match.MatchDTO);
+    return makeRequest(options).then((obj) => obj as RiotAPITypes.MatchV5.MatchDTO);
 }
 
 /* DEBUG:
@@ -121,7 +125,7 @@ const APP_LIMIT_2 = new RateLimit("100:120");
 const METHOD_LIMIT_MATCH = new RateLimit("2000:10");
 const METHOD_LIMIT_SUMMONER = new RateLimit("2000:60");
 const MAX_CONCURRENT = 1;
-const MIN_TIME = 50;
+const MIN_TIME = 1000;
 
 async function setReservoir(lim:Bottleneck, val:number):Promise<void> {
     let curRes = await lim.currentReservoir();
@@ -137,8 +141,56 @@ const appLimiter2 = makeBottleneck(MAX_CONCURRENT, MIN_TIME, APP_LIMIT_2);
 const summonerLimiter = makeBottleneck(MAX_CONCURRENT, MIN_TIME, METHOD_LIMIT_SUMMONER);
 const matchLimiter = makeBottleneck(MAX_CONCURRENT, MIN_TIME, METHOD_LIMIT_MATCH);
 
+matchLimiter.on("error", (error) => {console.error(error)});
+
 const ARAM_QUEUE_ID = 450;
 
 appLimiter2.chain(appLimiter1);
 summonerLimiter.chain(appLimiter2);
 matchLimiter.chain(appLimiter2);
+
+
+/*const getSummoner_rl = summonerLimiter.wrap(getSummoner);
+const getMatchIds_rl = summonerLimiter.wrap(getMatchIds);
+const getMatch_rl = summonerLimiter.wrap(getMatch);*/
+
+//for debug: must execute "$mkdir gamedata" in . to work
+function exportMatch(match:RiotAPITypes.MatchV5.MatchDTO) {
+    let json = JSON.stringify(match);
+    let matchId = match.metadata.matchId;
+    fs.writeFileSync(`./gamedata/${matchId}.json`, json);
+}
+
+async function getAllMatches(puuid:string) { //:Promise<string[]>
+    //note: couldn't get this to work using matchLimiter.submit (callback method)
+    //also works using wrap
+
+    matchLimiter.schedule(getMatchIds, puuid, {queue: ARAM_QUEUE_ID, count: 3,}).then((ids) => {
+        console.log(ids);
+        ids.forEach((id) => {
+            matchLimiter.schedule(getMatch, id).then(x => {
+                console.log(x)
+                exportMatch(x);
+            });
+        });
+    });
+    
+
+    /*mts.then((out2) => {
+        console.log(out2);
+        out2.forEach((id) => getMatch(id).then((match) => console.log(match)));
+    })*/
+    /*let matches = await getMatchIds_rl(puuid, {queue: ARAM_QUEUE_ID, count: 3,});
+    matches.forEach((id) => {
+        getMatch_rl(id).then(x => console.log(x));
+    });*/
+}
+
+getSummoner('agoofygoober').then((summ) => getAllMatches(summ.puuid));
+
+//recursive function to pull match data until no more matches come out
+/*
+        const allMatches = ids.map((id:string) => matchLimiter.submit(getMatch, id, (out) => console.log(out)));
+        return Promise.all(allMatches);
+*/
+
