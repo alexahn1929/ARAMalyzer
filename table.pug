@@ -1,11 +1,20 @@
-- let propertyNames = ['winsFor', 'lossesFor', 'gamesFor', 'winrateFor', 'winsAgainst', 'lossesAgainst', 'gamesAgainst', 'winrateAgainst', 'winsTotal', 'lossesTotal', 'gamesTotal', 'winrateTotal']
+- let headerCategories = ['Ally Team', 'Enemy Team', 'Total']
+- let propertyNames = ['Wins', 'Losses', 'Games', 'Win %']
+- let propertyNames2 = ['winsFor', 'lossesFor', 'gamesFor', 'winrateFor', 'winsAgainst', 'lossesAgainst', 'gamesAgainst', 'winrateAgainst', 'winsTotal', 'lossesTotal', 'gamesTotal', 'winrateTotal']
+//- add pick percentage?
+//- should clean this up -- using two propertyNames arrays is ugly
 table 
     tr 
-        th #{'champion'}
-        each param in propertyNames 
-            th #{param}
+        th
+        each header in headerCategories
+            th(colspan=4) #{header}
+    tr 
+        th #{'Champion'}
+        each header in headerCategories
+            each param in propertyNames 
+                th #{param}
     each value, key in data
         tr 
             td #{key}
-            each param in propertyNames
+            each param in propertyNames2
                 td #{value[param]}
