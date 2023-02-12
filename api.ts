@@ -5,8 +5,12 @@ import querystring = require('node:querystring');
 import path_to_regexp = require('path-to-regexp');
 import Bottleneck from "bottleneck";
 import fs = require('node:fs');
-import { ChampData, WinrateTable, getChampNames } from './gamedata';
+import { WinrateTable, getChampNames } from './gamedata';
 import { RiotRateLimits, LimitGroup } from './ratelimit';
+import express = require('express');
+
+const app = express();
+const port = 3000;
 
 const API_KEY = process.env.API_KEY;
 const PLATFORM = 'na1';
@@ -69,7 +73,7 @@ function makeRequest(opts:https.RequestOptions, type:string):Promise<object> {
         const request = https.request(opts, (res) => {
             /* DEBUG: */
             console.log('statusCode:', res.statusCode);
-            console.log('headers:', res.headers.vary, '\n');
+            console.log('headers:', res.headers, '\n');
 
             if (readHeaders && !(type in bnecks)) {
                 let interval = new LimitGroup(res.headers as object as RiotRateLimits, RATE_SAFENESS).calcInterval(); //ugly cast
@@ -224,6 +228,23 @@ async function setup() {
     readHeaders = false;
 }
 
-setup().then(() => getAllMatches('agoofygoober', 15).then(x => fs.writeFileSync(`./tables/table${Date.now()}.html`, x)));
+async function startServer() {
+    await setup();
+    app.get('/', (req, res) => {
+        res.send('hello world');
+    });
+
+    app.get('/summoner/:summName', async (req, res) => {
+        res.send(await getAllMatches(req.params.summName, 15));
+    });
+
+    app.listen(port, '138.88.147.173', () => {
+        console.log(`App listening on port ${port}`);
+    });
+}
+
+startServer();
+
+//setup().then(() => getAllMatches('agoofygoober', 15).then(x => fs.writeFileSync(`./tables/table${Date.now()}.html`, x)));
 
 //getAllMatches('agoofygoober', 6).then(x => fs.writeFileSync(`./tables/table${Date.now()}.html`, x)));

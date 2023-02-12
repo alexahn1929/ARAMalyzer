@@ -13,13 +13,14 @@ export function getChampNames():string[] {
     let champJson = JSON.parse(fs.readFileSync(`./resources/${PATCH}/data/${LANG}/champion.json`, {encoding: 'utf8'}));
     let champNames:string[] = [];
     for (const key in champJson.data) {
-        champNames.push(key); //gives MonkeyKing -- matchdto represents MF as "MissFortune"
+        //Inconsistency: Fiddlesticks represented as FiddleSticks in match API data
+        champNames.push(key.toLowerCase()); //gives MonkeyKing -- matchdto represents MF as "MissFortune"
         //champNames.push(champJson.data[key].name); //gives Wukong
     }
     return champNames;
 }
 
-export class ChampData {
+class ChampData {
     winsFor:number = 0;
     lossesFor:number = 0;
     gamesFor:number = 0;
@@ -97,7 +98,7 @@ export class WinrateTable {
             //get all champs in game
             const champs:string[] = [];
             for (const participant of game.info.participants) {
-                champs.push(participant.championName);
+                champs.push(participant.championName.toLowerCase()); //fix fiddlesticks inconsistency
             }
             
             //check if player won or lost
