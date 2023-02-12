@@ -12,7 +12,7 @@ const API_KEY = process.env.API_KEY;
 const PLATFORM = 'na1';
 const REGION = 'americas';
 const champNames = getChampNames();
-const RATE_LOOSENESS = 1.1;
+const RATE_SAFENESS = 1.1;
 const MAX_CONCURRENT = 1;
 const ARAM_QUEUE_ID = 450;
 
@@ -71,7 +71,7 @@ function makeRequest(opts:https.RequestOptions, type:string):Promise<object> {
 
             console.log(readHeaders, type, !(type in bnecks));
             if (readHeaders && !(type in bnecks)) {
-                let lg = new LimitGroup(res.headers as object as RiotRateLimits, RATE_LOOSENESS);
+                let lg = new LimitGroup(res.headers as object as RiotRateLimits, RATE_SAFENESS);
                 let interval = lg.calcInterval(); //ugly cast
                 console.log(type);
                 console.log(lg.limits);
@@ -159,7 +159,7 @@ getMatch('NA1_4573630208').then(x => console.log(getGameEnd(x)));
 async function getAllMatches(name:string, numMatches:number):Promise<string> { //returns HTML table. Later make numMatches an optional param
     //note: couldn't get this to work using matchLimiter.submit (callback method)
     //also works using wrap
-    const inc = 3;
+    const INC = 3;
 
     let puuid:string = await bnecks["summoner"].schedule(getSummoner, name).then((summ) => summ.puuid);
     let playerData = new WinrateTable(champNames, puuid);
@@ -173,10 +173,10 @@ async function getAllMatches(name:string, numMatches:number):Promise<string> { /
         else {
             let hasMatches = true;
             let newEnd = -1;
-            await bnecks["matchv5"].schedule(getMatchIds, puuid, {endTime, queue: ARAM_QUEUE_ID, count: inc,}).then((ids) => {
+            await bnecks["matchv5"].schedule(getMatchIds, puuid, {endTime, queue: ARAM_QUEUE_ID, count: INC,}).then((ids) => {
                 console.log("MATCH IDS:", ids);
 
-                if (ids.length < inc) {
+                if (ids.length < INC) {
                     console.log('no more matches');
                     hasMatches = false;
                 }
@@ -205,7 +205,7 @@ async function getAllMatches(name:string, numMatches:number):Promise<string> { /
                     console.error('Invalid newEnd');
                 }
                 console.log("recurring");
-                return getMatchesLimit(newEnd, remaining-inc);
+                return getMatchesLimit(newEnd, remaining-INC);
             }
         }
     }
