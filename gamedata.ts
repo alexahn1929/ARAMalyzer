@@ -3,10 +3,10 @@ import fs = require('node:fs');
 import path = require('node:path');
 import pug = require('pug');
 
-const renderTable = pug.compileFile('table.pug')
-
 const PATCH = '13.1.1';
 const LANG = 'en_US'
+
+const renderTable = pug.compileFile('table.pug');
 
 //assumes that the datadragon.tgz corresponding to version specified in PATCH has been unzipped into ./resources
 export function getChampNames():string[] {
@@ -101,20 +101,20 @@ export class WinrateTable {
             let againstIndex = playerIndex < 5 ? 5 : 0;
 
             for (let i = forIndex; i < forIndex+TEAMSIZE; i++) {
-                console.log(champs[i]);
+                //console.log(champs[i]);
                 playerWon ? this.table[champs[i]].addWinFor() : this.table[champs[i]].addLossFor();
             }
             for (let i = againstIndex; i < againstIndex+TEAMSIZE; i++) {
-                console.log(champs[i]);
+                //console.log(champs[i]);
                 playerWon ? this.table[champs[i]].addLossAgainst() : this.table[champs[i]].addWinAgainst();
             }
         }
     }
-    computeTable() {
+    computeTable():string {
         for (const champ in this.table) {
             this.table[champ].calculate();
         }
-        fs.writeFileSync(`./tables/table${Date.now()}.html`, renderTable({data: this.table}));
+        return renderTable({data:this.table});
     }
 }
 
@@ -144,4 +144,3 @@ for (const file of gf_new) {
 }
 testTable.computeTable();
 */
-
