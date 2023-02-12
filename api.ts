@@ -6,27 +6,60 @@ import path_to_regexp = require('path-to-regexp');
 import Bottleneck from "bottleneck";
 import fs = require('node:fs');
 import { ChampData, WinrateTable, getChampNames } from './gamedata';
+import { RiotRateLimits, LimitGroup } from './ratelimit';
 
 const API_KEY = process.env.API_KEY;
 const PLATFORM = 'na1';
 const REGION = 'americas';
 const champNames = getChampNames();
+const RATE_LOOSENESS = 1.1;
+const MAX_CONCURRENT = 1;
+const ARAM_QUEUE_ID = 450;
 
 const toHostname = path_to_regexp.compile(':domain.api.riotgames.com');
-const summonerPath:string = '/lol/summoner/v4/summoners/by-name/:name';
-const matchesPath:string = '/lol/match/v5/matches/by-puuid/:puuid/ids';
-const matchIdPath:string = '/lol/match/v5/matches/:matchId';
+const methodTypes:{[keys:string]:string} = {
+    summoner: "summoner",
+    matchIds: "matchv5",
+    match: "matchv5"
+};
+const domains:{[keys:string]:string} = {
+    summoner: PLATFORM,
+    matchIds: REGION,
+    match: REGION
+};
+const hosts:{[keys:string]:string} = {};
+for (let key in domains) {
+    hosts[key] = toHostname({domain:domains[key]});
+}
+const paths:{[keys:string]:string} = {
+    summoner: '/lol/summoner/v4/summoners/by-name/:name',
+    matchIds:'/lol/match/v5/matches/by-puuid/:puuid/ids',
+    match:'/lol/match/v5/matches/:matchId'
+};
+const pathFns:{[keys:string]:path_to_regexp.PathFunction} = {};
+for (let key in paths) {
+    pathFns[key] = path_to_regexp.compile(paths[key], {encode: encodeURIComponent});
+}
+const bnecks:{[keys:string]:Bottleneck} = {};
 
-let options:https.RequestOptions = {
+
+function makeBottleneck(maxConcurrent:number, minTime:number):Bottleneck {
+    return new Bottleneck({
+        maxConcurrent,
+        minTime,
+    });
+}
+
+const options:https.RequestOptions = {
     host: '',
     path: '',
     headers: {
         'X-Riot-Token':API_KEY,
     },
   };
+let readHeaders:boolean = false;
 
-
-function makeRequest(opts:https.RequestOptions):Promise<object> {
+function makeRequest(opts:https.RequestOptions, type:string):Promise<object> {
     // DEBUG
     console.log(opts);
 
@@ -35,12 +68,20 @@ function makeRequest(opts:https.RequestOptions):Promise<object> {
             /* DEBUG: */
             console.log('statusCode:', res.statusCode);
             console.log('headers:', res.headers, '\n');
-            /*res.on('data', (d) => {
-                process.stdout.write(d);
-            }); */
+
+            console.log(readHeaders, type, !(type in bnecks));
+            if (readHeaders && !(type in bnecks)) {
+                let lg = new LimitGroup(res.headers as object as RiotRateLimits, RATE_LOOSENESS);
+                let interval = lg.calcInterval(); //ugly cast
+                console.log(type);
+                console.log(lg.limits);
+                console.log(interval);
+                console.log();
+                bnecks[type] = makeBottleneck(MAX_CONCURRENT, interval);
+                bnecks[type].on("error", (error) => {console.error(error)});
+            }
 
             if (typeof res.statusCode !== 'undefined' && (res.statusCode < 200 || res.statusCode >= 300)) {
-                console.log(new Error('statusCode=' + res.statusCode));
                 return reject(new Error('statusCode=' + res.statusCode));
             }
             
@@ -62,99 +103,33 @@ function makeRequest(opts:https.RequestOptions):Promise<object> {
 }
 
 function getSummoner(name:string): Promise<RiotAPITypes.Summoner.SummonerDTO> {
-    const toPath = path_to_regexp.compile(summonerPath, {encode: encodeURIComponent});
-    options.host = toHostname({domain:PLATFORM});
-    options.path = toPath({name});
+    const key = 'summoner';
+    options.host = toHostname({domain: domains[key]});
+    options.path = pathFns[key]({name});
     
-    return makeRequest(options).then((obj) => obj as RiotAPITypes.Summoner.SummonerDTO);
+    return makeRequest(options, methodTypes[key]).then((obj) => obj as RiotAPITypes.Summoner.SummonerDTO);
 }
 
 function getMatchIds(puuid:string, params?:querystring.ParsedUrlQueryInput): Promise<string[]> {
-    const toPath = path_to_regexp.compile(matchesPath, {encode: encodeURIComponent});
-    options.host = toHostname({domain:REGION});
-    options.path = toPath({puuid});
+    const key = 'matchIds';
+    options.host = toHostname({domain: domains[key]}); //redundant - can be done outside function
+    options.path = pathFns[key]({puuid});
     if (typeof params !== 'undefined') {
         options.path += `?${querystring.encode(params)}`;
     }
     //console.log(options);
 
-    return makeRequest(options).then((obj) => obj as string[]);
+    return makeRequest(options, methodTypes[key]).then((obj) => obj as string[]);
 }
 
 function getMatch(matchId:string): Promise<RiotAPITypes.MatchV5.MatchDTO> {
-    const toPath = path_to_regexp.compile(matchIdPath, {encode: encodeURIComponent});
-    options.host = toHostname({domain:REGION});
-    options.path = toPath({matchId});
+    const key = 'match';
+    options.host = toHostname({domain: domains[key]});
+    options.path = pathFns[key]({matchId});
 
-    return makeRequest(options).then((obj) => obj as RiotAPITypes.MatchV5.MatchDTO);
+    return makeRequest(options, methodTypes[key]).then((obj) => obj as RiotAPITypes.MatchV5.MatchDTO);
 }
 
-/* DEBUG:
-let sm = getSummoner('agoofygoober');
-sm.then((out) => {
-    console.log(out);
-    let mts = getMatchIds(out.puuid, {queue: 450, start: 0, count: 3,});
-    mts.then((out2) => {
-        console.log(out2);
-        out2.forEach((id) => getMatch(id).then((match) => console.log(match)));
-    })
-});*/
-
-
-class RateLimit {
-    public res:number;
-    public interval:number;
-
-    constructor(rl:string) {
-        let data = rl.split(":");
-        this.res = Number(data[0]);
-        this.interval = Number(data[1]);
-    }
-}
-
-function makeBottleneck(maxConcurrent:number, minTime:number, rl:RateLimit):Bottleneck {
-    return new Bottleneck({
-        maxConcurrent,
-        minTime,
-        reservoir: rl.res,
-        reservoirRefreshAmount: rl.res,
-        reservoirRefreshInterval: rl.interval,
-    });
-}
-
-const APP_LIMIT_1 = new RateLimit("20:1");
-const APP_LIMIT_2 = new RateLimit("100:120");
-const METHOD_LIMIT_MATCH = new RateLimit("2000:10");
-const METHOD_LIMIT_SUMMONER = new RateLimit("2000:60");
-const MAX_CONCURRENT = 1;
-const MIN_TIME = 1000;
-
-async function setReservoir(lim:Bottleneck, val:number):Promise<void> {
-    let curRes = await lim.currentReservoir();
-    if (typeof curRes === 'number') {
-        await lim.incrementReservoir(val - curRes);
-        console.log(`reservoir incremented from ${curRes} to ${await lim.currentReservoir()}`)
-    }
-}
-
-
-const appLimiter1 = makeBottleneck(MAX_CONCURRENT, MIN_TIME, APP_LIMIT_1);
-const appLimiter2 = makeBottleneck(MAX_CONCURRENT, MIN_TIME, APP_LIMIT_2);
-const summonerLimiter = makeBottleneck(MAX_CONCURRENT, MIN_TIME, METHOD_LIMIT_SUMMONER);
-const matchLimiter = makeBottleneck(MAX_CONCURRENT, MIN_TIME, METHOD_LIMIT_MATCH);
-
-matchLimiter.on("error", (error) => {console.error(error)});
-
-const ARAM_QUEUE_ID = 450;
-
-appLimiter2.chain(appLimiter1);
-summonerLimiter.chain(appLimiter2);
-matchLimiter.chain(appLimiter2);
-
-
-/*const getSummoner_rl = summonerLimiter.wrap(getSummoner);
-const getMatchIds_rl = summonerLimiter.wrap(getMatchIds);
-const getMatch_rl = summonerLimiter.wrap(getMatch);*/
 
 //for debug: must execute "$mkdir gamedata" in . to work
 function exportMatch(match:RiotAPITypes.MatchV5.MatchDTO) {
@@ -163,43 +138,95 @@ function exportMatch(match:RiotAPITypes.MatchV5.MatchDTO) {
     fs.writeFileSync(`./gamedata/${matchId}.json`, json);
 }
 
-//rename to analyzeMatches later?
-async function getAllMatches(puuid:string) { //:Promise<string>, for table?
-    //note: couldn't get this to work using matchLimiter.submit (callback method)
-    //also works using wrap
-    let playerData = new WinrateTable(champNames, puuid);
-    let hasMatches = true;
-    await matchLimiter.schedule(getMatchIds, puuid, {queue: ARAM_QUEUE_ID, count: 3,}).then((ids) => {
-        console.log(ids);
 
-        if (ids.length === 0) {
-            hasMatches = false;
-        }
-        return Promise.all(ids.map(async (id) => {
-            await matchLimiter.schedule(getMatch, id).then((game) => {
-                console.log(game);
-                //exportMatch(game);
-                playerData.logGame(game);
-            });
-        }));
-    });
-    playerData.computeTable();
-
-    /*mts.then((out2) => {
-        console.log(out2);
-        out2.forEach((id) => getMatch(id).then((match) => console.log(match)));
-    })*/
-    /*let matches = await getMatchIds_rl(puuid, {queue: ARAM_QUEUE_ID, count: 3,});
-    matches.forEach((id) => {
-        getMatch_rl(id).then(x => console.log(x));
-    });*/
+function getGameEnd(game:RiotAPITypes.MatchV5.MatchDTO):number {
+    let info = game.info;
+    if ("gameEndTimestamp" in info) {
+        //console.log("yaas");
+        return info.gameEndTimestamp as number;
+    }
+    return info.gameStartTimestamp + info.gameDuration;
 }
-
-getSummoner('agoofygoober').then((summ) => getAllMatches(summ.puuid));
-
-//recursive function to pull match data until no more matches come out
-/*
-        const allMatches = ids.map((id:string) => matchLimiter.submit(getMatch, id, (out) => console.log(out)));
-        return Promise.all(allMatches);
+/* DEBUG
+getMatch('NA1_4050029730').then(x => console.log(getGameEnd(x)));
+console.log();
+getMatch('NA1_4573630208').then(x => console.log(getGameEnd(x)));
 */
 
+
+//rename to analyzeProfile later?
+//inner functions may be slower?
+async function getAllMatches(name:string, numMatches:number):Promise<string> { //returns HTML table. Later make numMatches an optional param
+    //note: couldn't get this to work using matchLimiter.submit (callback method)
+    //also works using wrap
+    const inc = 3;
+
+    let puuid:string = await bnecks["summoner"].schedule(getSummoner, name).then((summ) => summ.puuid);
+    let playerData = new WinrateTable(champNames, puuid);
+
+    async function getMatchesLimit(endTime:number, remaining:number):Promise<string> {
+        console.log("hi");
+        if (remaining <= 0) {
+            console.log('none remaining');
+            return playerData.computeTable();
+        }
+        else {
+            let hasMatches = true;
+            let newEnd = -1;
+            await bnecks["matchv5"].schedule(getMatchIds, puuid, {endTime, queue: ARAM_QUEUE_ID, count: inc,}).then((ids) => {
+                console.log("MATCH IDS:", ids);
+
+                if (ids.length < inc) {
+                    console.log('no more matches');
+                    hasMatches = false;
+                }
+                return Promise.all(ids.map(async (id) => { // vs. using a for...of loop, this function waits for all results before computing final table or making next matchIDs query
+                    await bnecks["matchv5"].schedule(getMatch, id).then((game) => { // this needs await -- otherwise the parent function returns Promise.all before all games are logged
+                        if (id === ids[ids.length-1]) {
+                            console.log("LAST ID:", id);
+                            newEnd = Math.floor(getGameEnd(game)/1000)-30; //set endTime of next getMatchIds call to 30 seconds before end of the oldest game
+                            console.log(newEnd);
+                        }
+
+                        //add param to WinrateTable: set/list of gameIds logged
+                        //add param to WinrateTable: id/timestamp of earliest game logged
+
+                        //console.log(game);
+                        //exportMatch(game);
+                        playerData.logGame(game);
+                    });
+                }));
+            });
+            if (!hasMatches) {
+                return playerData.computeTable();
+            }
+            else {
+                if (newEnd === -1) {
+                    console.error('Invalid newEnd');
+                }
+                console.log("recurring");
+                return getMatchesLimit(newEnd, remaining-inc);
+            }
+        }
+    }
+    return getMatchesLimit(Math.floor(Date.now()/1000), numMatches);
+    //async function getMatchesNoLimit(endTime:number):Promise<string> {
+
+    /*if (typeof numMatches !== 'undefined') {
+        return getMatchesLimit(Math.floor(Date.now()/1000), numMatches);
+    }
+    else {
+        return getMatchesNoLimit(Math.floor(Date.now()/1000));
+    }*/
+}
+
+
+async function setup() {
+    readHeaders = true;
+    await getSummoner('agoofygoober').then((summ) => getMatchIds(summ.puuid));
+    readHeaders = false;
+}
+
+setup().then(() => setup());
+
+//getAllMatches('agoofygoober', 6).then(x => fs.writeFileSync(`./tables/table${Date.now()}.html`, x)));
