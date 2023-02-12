@@ -20,20 +20,20 @@ export function getChampNames():string[] {
 }
 
 export class ChampData {
-    public winsFor:number = 0;
-    public lossesFor:number = 0;
-    public gamesFor:number = 0;
-    public winrateFor:number = 0;
+    winsFor:number = 0;
+    lossesFor:number = 0;
+    gamesFor:number = 0;
+    winrateFor:string = '';
 
-    public winsAgainst:number = 0;
-    public lossesAgainst:number = 0;
-    public gamesAgainst:number = 0;
-    public winrateAgainst:number = 0;
+    winsAgainst:number = 0;
+    lossesAgainst:number = 0;
+    gamesAgainst:number = 0;
+    winrateAgainst:string = '';
 
-    public winsTotal:number = 0;
-    public lossesTotal:number = 0;
-    public gamesTotal:number = 0;
-    public winrateTotal:number = 0;
+    winsTotal:number = 0;
+    lossesTotal:number = 0;
+    gamesTotal:number = 0;
+    winrateTotal:string = '';
 
     addWinFor() {
         this.winsFor += 1;
@@ -49,16 +49,16 @@ export class ChampData {
     }
 
     calculate() {
-        this.gamesFor = this.winsFor+this.lossesFor;
-        this.winrateFor = this.winsFor/this.gamesFor * 100;
-
-        this.gamesAgainst = this.winsAgainst+this.lossesAgainst;
-        this.winrateAgainst = this.winsAgainst/this.gamesAgainst * 100;
-
         this.winsTotal = this.winsFor + this.winsAgainst;
         this.lossesTotal = this.lossesFor + this.lossesAgainst;
+        
+        this.gamesFor = this.winsFor+this.lossesFor;
+        this.gamesAgainst = this.winsAgainst+this.lossesAgainst;
         this.gamesTotal = this.winsTotal + this.lossesTotal;
-        this.winrateTotal = this.winsTotal/this.gamesTotal * 100;
+        
+        this.winrateFor = this.gamesFor > 0 ? (this.winsFor/this.gamesFor).toLocaleString(undefined,{style: 'percent', maximumFractionDigits:0}) : '';
+        this.winrateAgainst = this.gamesAgainst > 0 ? (this.winsAgainst/this.gamesAgainst).toLocaleString(undefined,{style: 'percent', maximumFractionDigits:0}) : '';
+        this.winrateTotal = this.gamesTotal > 0 ? (this.winsTotal/this.gamesTotal).toLocaleString(undefined,{style: 'percent', maximumFractionDigits:0}) : '';
     }
 }
 
