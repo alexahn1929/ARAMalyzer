@@ -12,9 +12,11 @@ const API_KEY = process.env.API_KEY;
 const PLATFORM = 'na1';
 const REGION = 'americas';
 const champNames = getChampNames();
+const ARAM_QUEUE_ID = 450;
+
 const RATE_SAFENESS = 1.1;
 const MAX_CONCURRENT = 1;
-const ARAM_QUEUE_ID = 450;
+const INC = 5;
 
 const toHostname = path_to_regexp.compile(':domain.api.riotgames.com');
 const methodTypes:{[keys:string]:string} = {
@@ -67,16 +69,10 @@ function makeRequest(opts:https.RequestOptions, type:string):Promise<object> {
         const request = https.request(opts, (res) => {
             /* DEBUG: */
             console.log('statusCode:', res.statusCode);
-            console.log('headers:', res.headers, '\n');
+            console.log('headers:', res.headers.vary, '\n');
 
-            console.log(readHeaders, type, !(type in bnecks));
             if (readHeaders && !(type in bnecks)) {
-                let lg = new LimitGroup(res.headers as object as RiotRateLimits, RATE_SAFENESS);
-                let interval = lg.calcInterval(); //ugly cast
-                console.log(type);
-                console.log(lg.limits);
-                console.log(interval);
-                console.log();
+                let interval = new LimitGroup(res.headers as object as RiotRateLimits, RATE_SAFENESS).calcInterval(); //ugly cast
                 bnecks[type] = makeBottleneck(MAX_CONCURRENT, interval);
                 bnecks[type].on("error", (error) => {console.error(error)});
             }
@@ -159,15 +155,16 @@ getMatch('NA1_4573630208').then(x => console.log(getGameEnd(x)));
 async function getAllMatches(name:string, numMatches:number):Promise<string> { //returns HTML table. Later make numMatches an optional param
     //note: couldn't get this to work using matchLimiter.submit (callback method)
     //also works using wrap
-    const INC = 3;
 
     let puuid:string = await bnecks["summoner"].schedule(getSummoner, name).then((summ) => summ.puuid);
     let playerData = new WinrateTable(champNames, puuid);
 
     async function getMatchesLimit(endTime:number, remaining:number):Promise<string> {
-        console.log("hi");
         if (remaining <= 0) {
             console.log('none remaining');
+            if(numMatches !== playerData.loggedGames.size) {
+                console.error("ERROR - MISSING GAMES");
+            }
             return playerData.computeTable();
         }
         else {
@@ -185,19 +182,19 @@ async function getAllMatches(name:string, numMatches:number):Promise<string> { /
                         if (id === ids[ids.length-1]) {
                             console.log("LAST ID:", id);
                             newEnd = Math.floor(getGameEnd(game)/1000)-30; //set endTime of next getMatchIds call to 30 seconds before end of the oldest game
-                            console.log(newEnd);
+                            console.log("NEW END:", newEnd);
                         }
-
-                        //add param to WinrateTable: set/list of gameIds logged
-                        //add param to WinrateTable: id/timestamp of earliest game logged
 
                         //console.log(game);
                         //exportMatch(game);
-                        playerData.logGame(game);
+                        playerData.logGame(game, id);
                     });
                 }));
             });
             if (!hasMatches) {
+                if(numMatches !== playerData.loggedGames.size) {
+                    console.error("ERROR - MISSING GAMES");
+                }
                 return playerData.computeTable();
             }
             else {
@@ -227,6 +224,6 @@ async function setup() {
     readHeaders = false;
 }
 
-setup().then(() => setup());
+setup().then(() => getAllMatches('agoofygoober', 15).then(x => fs.writeFileSync(`./tables/table${Date.now()}.html`, x)));
 
 //getAllMatches('agoofygoober', 6).then(x => fs.writeFileSync(`./tables/table${Date.now()}.html`, x)));

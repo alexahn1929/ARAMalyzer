@@ -65,6 +65,7 @@ export class ChampData {
 export class WinrateTable {
     puuid:string;
     table:{[key:string]:ChampData} = {};
+    loggedGames:Set<string> = new Set();
     constructor(champNames:string[], puuid:string) {
         /*this.table = champNames.reduce((map:{[key:string]:ChampData}, name) => {
             map[name] = new ChampData();
@@ -79,8 +80,14 @@ export class WinrateTable {
     addChamp(champ:string) {
         this.table[champ] = new ChampData();
     }
-    logGame(game:RiotAPITypes.MatchV5.MatchDTO) { //could accept a puuid as an argument?
+    logGame(game:RiotAPITypes.MatchV5.MatchDTO, id:string) { //could accept a puuid as an argument?
         const TEAMSIZE = 5;
+
+        if (this.loggedGames.has(id)) {
+            console.error("ERROR - duplicate game", id);
+        }
+
+        this.loggedGames.add(id);
 
         const playerIndex = game.metadata.participants.indexOf(this.puuid);
         if (playerIndex === -1) {
