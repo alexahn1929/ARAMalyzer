@@ -238,7 +238,7 @@ async function startServer() {
         res.send(await getAllMatches(req.params.summName, 15));
     });
 
-    app.listen(port, '138.88.147.173', () => {
+    app.listen(port, () => {
         console.log(`App listening on port ${port}`);
     });
 }
