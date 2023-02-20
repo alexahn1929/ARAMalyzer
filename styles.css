@@ -59,13 +59,13 @@ li a {
     height: 64px;
 }
 
-.querybar {
+#querybar {
     flex: 1 2 600px;
     font-size: 20px;
     padding: 16px;
 }
 
-.querybutton {
+#querybutton {
     flex: 0 1 100px;
     font-size: 20px;
 }

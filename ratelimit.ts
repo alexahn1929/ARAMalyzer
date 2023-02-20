@@ -16,7 +16,7 @@ class RateLimit {
     }
 }
 
-export class LimitGroup { //when calculating interval, take into account first requests (for startup). settimeout 5 seconds?
+export class LimitGroup {
     private safeness:number;
 
     limits:RateLimit[]; //make private after debug

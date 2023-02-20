@@ -160,7 +160,12 @@ async function getAllMatches(name:string, numMatches:number):Promise<string> { /
     //note: couldn't get this to work using matchLimiter.submit (callback method)
     //also works using wrap
 
-    let puuid:string = await bnecks["summoner"].schedule(getSummoner, name).then((summ) => summ.puuid);
+    let puuid:string = await bnecks["summoner"].schedule(getSummoner, name).then((summ) => summ.puuid)/*.catch(() => {return ""});
+    
+    if (puuid === "") {
+        return "USER NOT FOUND"; //with react, just return {}?
+    }*/
+
     let playerData = new WinrateTable(champNames, puuid);
 
     async function getMatchesLimit(endTime:number, remaining:number):Promise<string> {
@@ -230,12 +235,14 @@ async function setup() {
 
 async function startServer() {
     await setup();
-    app.get('/', (req, res) => {
-        res.send('hello world');
-    });
 
-    app.get('/summoner/:summName', async (req, res) => {
-        res.send(await getAllMatches(req.params.summName, 15));
+    app.get('/:summName', async (req, res) => {
+        try {
+            res.send(await getAllMatches(req.params.summName, 5));
+        }
+        catch {
+            res.sendStatus(404);
+        }
     });
 
     app.listen(port, () => {
