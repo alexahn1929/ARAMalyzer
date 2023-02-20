@@ -3,14 +3,12 @@ import fs = require('node:fs');
 import path = require('node:path');
 import pug = require('pug');
 
-const PATCH = '13.1.1';
-const LANG = 'en_US'
-
 const renderTable = pug.compileFile('table.pug');
 
-//assumes that the datadragon.tgz corresponding to version specified in PATCH has been unzipped into ./resources
+//assumes that champion.json from the most recent patch has been saved in ./resources
+//example URL: https://ddragon.leagueoflegends.com/cdn/13.1.1/data/en_US/champion.json
 export function getChampNames():string[] {
-    let champJson = JSON.parse(fs.readFileSync(`./resources/${PATCH}/data/${LANG}/champion.json`, {encoding: 'utf8'}));
+    let champJson = JSON.parse(fs.readFileSync(`./resources/champion.json`, {encoding: 'utf8'}));
     let champNames:string[] = [];
     for (const key in champJson.data) {
         //Inconsistency: Fiddlesticks represented as FiddleSticks in match API data
