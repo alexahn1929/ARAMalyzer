@@ -5,7 +5,7 @@ button.addEventListener("click", function () {
     let str = bar.value.trim();
     console.log(str);
     if (str !== "") {
-        window.location.href = `/${str}`;
+        window.location.href = `/summoner/${str}`;
     }
 });
 

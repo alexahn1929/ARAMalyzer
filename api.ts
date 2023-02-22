@@ -235,8 +235,7 @@ async function setup() {
 
 async function startServer() {
     await setup();
-
-    app.get('/:summName', async (req, res) => {
+    app.get('/api/:summName', async (req, res) => {
         try {
             res.send(await getAllMatches(req.params.summName, 5));
         }
