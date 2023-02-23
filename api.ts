@@ -264,13 +264,24 @@ async function updateProfile(name:string, numGames=3) { //later change name to p
 
 async function startServer() {
     await setup();
-    app.get('/api/:summName', async (req, res) => {
+    /*app.get('/api/:summName', async (req, res) => {
         try {
             res.send(await getAllMatches(req.params.summName, 6));
         }
         catch {
             res.sendStatus(404);
         }
+    });*/
+    app.get('/api/get/:summName', async (req, res) => {
+        try {
+            res.send(await getProfile(req.params.summName));
+        }
+        catch {
+            res.sendStatus(404);
+        }
+    });
+    app.get('/api/update/:summName', async (req, res) => {
+        res.send(await updateProfile(req.params.summName));
     });
 
     app.listen(port, () => {
@@ -278,9 +289,10 @@ async function startServer() {
     });
 
 
+    /*DEBUG:
     fs.writeFileSync(`./tables/table${Date.now()}.html`, await getProfile("agoofygoober"));
     fs.writeFileSync(`./tables/table${Date.now()}.html`, await getProfile("agoofygoober"));
-    fs.writeFileSync(`./tables/table${Date.now()}.html`, await updateProfile("agoofygoober"));
+    fs.writeFileSync(`./tables/table${Date.now()}.html`, await updateProfile("agoofygoober"));*/
 }
 
 startServer();
