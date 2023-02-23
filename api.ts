@@ -252,7 +252,6 @@ async function updateProfile(name:string, numGames=3) { //later change name to p
 
     let puuid:string = await bnecks["summoner"].schedule(getSummoner, name).then((summ) => summ.puuid);
     let wt:WinrateTable = WinrateTable.from((await col.findOneAndDelete({puuid})).value);
-    console.log(wt.computeTable());
     let ct = Math.min(numGames, wt.unloggedGames.length);
     for (let i=0; i < ct; i++) {
         let id = wt.unloggedGames.pop();
