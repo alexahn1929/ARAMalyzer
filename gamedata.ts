@@ -59,13 +59,17 @@ class ChampData {
         this.winrateAgainst = this.gamesAgainst > 0 ? (this.winsAgainst/this.gamesAgainst).toLocaleString(undefined,{style: 'percent', maximumFractionDigits:0}) : '';
         this.winrateTotal = this.gamesTotal > 0 ? (this.winsTotal/this.gamesTotal).toLocaleString(undefined,{style: 'percent', maximumFractionDigits:0}) : '';
     }
+    static from(obj):ChampData {
+        return Object.assign(new ChampData(), obj);
+    }
 }
 
 export class WinrateTable {
     puuid:string;
     table:{[key:string]:ChampData} = {};
     loggedGames:Set<string> = new Set();
-    constructor(champNames:string[], puuid:string) {
+    unloggedGames:string[] = [];
+    constructor(puuid:string, champNames:string[]) {
         /*this.table = champNames.reduce((map:{[key:string]:ChampData}, name) => {
             map[name] = new ChampData();
             return map;
@@ -121,6 +125,12 @@ export class WinrateTable {
             this.table[champ].calculate();
         }
         return renderTable({data:this.table});
+    }
+    static from(obj):WinrateTable {
+        for (let champ in obj.table) {
+            obj.table[champ] = ChampData.from(obj.table[champ]);
+        }
+        return Object.assign(new WinrateTable("", []), obj);
     }
 }
 

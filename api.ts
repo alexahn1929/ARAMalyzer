@@ -9,10 +9,13 @@ import { WinrateTable, getChampNames } from './gamedata';
 import { RiotRateLimits, LimitGroup } from './ratelimit';
 import express = require('express');
 
+const { MongoClient, ServerApiVersion } = require('mongodb');
+
 const app = express();
 const port = 3000;
 
 const API_KEY = process.env.API_KEY;
+const DB_CONN_STRING = process.env.DB_CONN_STRING;
 const PLATFORM = 'na1';
 const REGION = 'americas';
 const champNames = getChampNames();
@@ -48,13 +51,7 @@ for (let key in paths) {
 }
 const bnecks:{[keys:string]:Bottleneck} = {};
 
-
-function makeBottleneck(maxConcurrent:number, minTime:number):Bottleneck {
-    return new Bottleneck({
-        maxConcurrent,
-        minTime,
-    });
-}
+const client = new MongoClient(DB_CONN_STRING, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
 
 const options:https.RequestOptions = {
     host: '',
@@ -74,15 +71,13 @@ function makeRequest(opts:https.RequestOptions, type:string):Promise<object> {
             /* DEBUG: */
             console.log('statusCode:', res.statusCode);
             console.log('headers:', res.headers, '\n');
-
-            if (readHeaders && !(type in bnecks)) {
-                let interval = new LimitGroup(res.headers as object as RiotRateLimits, RATE_SAFENESS).calcInterval(); //ugly cast
-                bnecks[type] = makeBottleneck(MAX_CONCURRENT, interval);
-                bnecks[type].on("error", (error) => {console.error(error)});
-            }
-
             if (typeof res.statusCode !== 'undefined' && (res.statusCode < 200 || res.statusCode >= 300)) {
                 return reject(new Error('statusCode=' + res.statusCode));
+            }
+            if (readHeaders && !(type in bnecks)) {
+                let interval = new LimitGroup(res.headers as object as RiotRateLimits, RATE_SAFENESS).calcInterval(); //ugly cast
+                bnecks[type] = new Bottleneck({maxConcurrent: MAX_CONCURRENT, minTime: interval});
+                bnecks[type].on("error", (error) => {console.error(error)});
             }
             
             let data = '';
@@ -166,12 +161,12 @@ async function getAllMatches(name:string, numMatches:number):Promise<string> { /
         return "USER NOT FOUND"; //with react, just return {}?
     }*/
 
-    let playerData = new WinrateTable(champNames, puuid);
+    let playerData = new WinrateTable(puuid, champNames);
 
     async function getMatchesLimit(endTime:number, remaining:number):Promise<string> {
         if (remaining <= 0) {
             console.log('none remaining');
-            if(numMatches !== playerData.loggedGames.size) {
+            if(numMatches !== playerData.loggedGames.size) { //currently, if trying to log 6 with inc 5, will think there is an error
                 console.error("ERROR - MISSING GAMES");
             }
             return playerData.computeTable();
@@ -201,7 +196,7 @@ async function getAllMatches(name:string, numMatches:number):Promise<string> { /
                 }));
             });
             if (!hasMatches) {
-                if(numMatches !== playerData.loggedGames.size) {
+                if(numMatches !== playerData.loggedGames.size) { //currently, will error if you request more games than exist for an account.
                     console.error("ERROR - MISSING GAMES");
                 }
                 return playerData.computeTable();
@@ -226,18 +221,50 @@ async function getAllMatches(name:string, numMatches:number):Promise<string> { /
     }*/
 }
 
-
+let col;
 async function setup() {
+    await client.connect();
+    console.log("Connected correctly to server");
+    col = client.db("aram").collection("accounts");
+
     readHeaders = true;
     await getSummoner('agoofygoober').then((summ) => getMatchIds(summ.puuid));
     readHeaders = false;
 }
 
+async function getProfile(name:string) {
+    let puuid:string = await bnecks["summoner"].schedule(getSummoner, name).then((summ) => summ.puuid); //if this errors, should send 404 to client api request
+    let doc = await col.findOne({puuid});
+    if (doc !== null) {
+        console.log("found");
+        return WinrateTable.from(doc).computeTable();
+    }
+    else {
+        console.log("not found");
+        let wt = new WinrateTable(puuid, champNames);
+        await bnecks["matchv5"].schedule(getMatchIds, puuid, {queue: ARAM_QUEUE_ID}).then((ids) => {
+            for (let id of ids) {
+                wt.unloggedGames.push(id);
+            }
+        }); //later add endTime as a param to get all games recursively
+        await col.insertOne(wt);
+        return wt.computeTable();
+    }
+}
+
+/*func update(ign, numGames=3)
+    (if Date.now()-lastUpdated more than 1 day:
+        add new games)
+
+    get document by ign (later change to puuid)
+    for i in range(min(numGames, len(unlogged)): //take care bc length of set changes with each loop
+        pop unlogged, log that game (await promise all?)*/
+
 async function startServer() {
     await setup();
     app.get('/api/:summName', async (req, res) => {
         try {
-            res.send(await getAllMatches(req.params.summName, 5));
+            res.send(await getAllMatches(req.params.summName, 6));
         }
         catch {
             res.sendStatus(404);
@@ -247,6 +274,18 @@ async function startServer() {
     app.listen(port, () => {
         console.log(`App listening on port ${port}`);
     });
+
+
+    //test: getProfile, method which runs immediately when a summoner page is opened on ARAMalyzer
+    try {
+        await getProfile("asdlkfja;wlekjfawe;lkjfawle;kjf");
+    }
+    catch(err) {
+        console.log(err);
+    }
+    
+    fs.writeFileSync(`./tables/table${Date.now()}.html`, await getProfile("agoofygoober"));
+    fs.writeFileSync(`./tables/table${Date.now()}.html`, await getProfile("agoofygoober"));
 }
 
 startServer();
