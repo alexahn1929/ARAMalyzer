@@ -67,7 +67,9 @@ class ChampData {
 export class WinrateTable {
     puuid:string;
     table:{[key:string]:ChampData} = {};
-    loggedGames:Set<string> = new Set();
+    //loggedGames:Set<string> = new Set();
+    startTime; //update during logGame, for tracking what games to be pulled next. set initial value from last index at instantiation time?
+    endTime; //set initial value at instantiation time (getProfile)
     unloggedGames:string[] = [];
     constructor(puuid:string, champNames:string[]) {
         /*this.table = champNames.reduce((map:{[key:string]:ChampData}, name) => {
@@ -83,14 +85,17 @@ export class WinrateTable {
     addChamp(champ:string) {
         this.table[champ] = new ChampData();
     }
-    logGame(game:RiotAPITypes.MatchV5.MatchDTO, id:string) { //could accept a puuid as an argument?
+    logGame(game:RiotAPITypes.MatchV5.MatchDTO) {
         const TEAMSIZE = 5;
+        let id:string = game.metadata.matchId;
 
-        if (this.loggedGames.has(id)) {
+        /*if (this.loggedGames.has(id)) {
             console.error("ERROR - duplicate game", id);
         }
+        this.loggedGames.add(id);*/
 
-        this.loggedGames.add(id);
+        //startTime = min(startTime, time of this game)
+        //endTime = max(endTime, time of this game) -- but make sure this game won't be included in future matchId queries!
 
         const playerIndex = game.metadata.participants.indexOf(this.puuid);
         if (playerIndex === -1) {

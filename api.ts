@@ -166,9 +166,6 @@ async function getAllMatches(name:string, numMatches:number):Promise<string> { /
     async function getMatchesLimit(endTime:number, remaining:number):Promise<string> {
         if (remaining <= 0) {
             console.log('none remaining');
-            if(numMatches !== playerData.loggedGames.size) { //currently, if trying to log 6 with inc 5, will think there is an error
-                console.error("ERROR - MISSING GAMES");
-            }
             return playerData.computeTable();
         }
         else {
@@ -191,14 +188,11 @@ async function getAllMatches(name:string, numMatches:number):Promise<string> { /
 
                         //console.log(game);
                         //exportMatch(game);
-                        playerData.logGame(game, id);
+                        playerData.logGame(game);
                     });
                 }));
             });
             if (!hasMatches) {
-                if(numMatches !== playerData.loggedGames.size) { //currently, will error if you request more games than exist for an account.
-                    console.error("ERROR - MISSING GAMES");
-                }
                 return playerData.computeTable();
             }
             else {
@@ -242,7 +236,7 @@ async function getProfile(name:string) {
     else {
         console.log("not found");
         let wt = new WinrateTable(puuid, champNames);
-        await bnecks["matchv5"].schedule(getMatchIds, puuid, {queue: ARAM_QUEUE_ID}).then((ids) => {
+        await bnecks["matchv5"].schedule(getMatchIds, puuid, {queue: ARAM_QUEUE_ID, count:100}).then((ids) => {
             for (let id of ids) {
                 wt.unloggedGames.push(id);
             }
@@ -252,13 +246,21 @@ async function getProfile(name:string) {
     }
 }
 
-/*func update(ign, numGames=3)
-    (if Date.now()-lastUpdated more than 1 day:
-        add new games)
+async function updateProfile(name:string, numGames=3) { //later change name to puuid (when using react frontend)
+    //if Date.now()-lastUpdated more than 1 day:
+    //    add new games
 
-    get document by ign (later change to puuid)
-    for i in range(min(numGames, len(unlogged)): //take care bc length of set changes with each loop
-        pop unlogged, log that game (await promise all?)*/
+    let puuid:string = await bnecks["summoner"].schedule(getSummoner, name).then((summ) => summ.puuid);
+    let wt:WinrateTable = WinrateTable.from((await col.findOneAndDelete({puuid})).value);
+    console.log(wt.computeTable());
+    let ct = Math.min(numGames, wt.unloggedGames.length);
+    for (let i=0; i < ct; i++) {
+        let id = wt.unloggedGames.pop();
+        await bnecks["matchv5"].schedule(getMatch, id).then((game) => wt.logGame(game));
+    }
+    await col.insertOne(wt);
+    return wt.computeTable();
+}
 
 async function startServer() {
     await setup();
@@ -276,16 +278,9 @@ async function startServer() {
     });
 
 
-    //test: getProfile, method which runs immediately when a summoner page is opened on ARAMalyzer
-    try {
-        await getProfile("asdlkfja;wlekjfawe;lkjfawle;kjf");
-    }
-    catch(err) {
-        console.log(err);
-    }
-    
     fs.writeFileSync(`./tables/table${Date.now()}.html`, await getProfile("agoofygoober"));
     fs.writeFileSync(`./tables/table${Date.now()}.html`, await getProfile("agoofygoober"));
+    fs.writeFileSync(`./tables/table${Date.now()}.html`, await updateProfile("agoofygoober"));
 }
 
 startServer();
