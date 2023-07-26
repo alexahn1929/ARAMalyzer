@@ -1,5 +1,5 @@
 .env
 *.js
 node_modules
-*.docx
-test.ts
+etc
+server/resources

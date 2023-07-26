@@ -8,7 +8,7 @@ const renderTable = pug.compileFile('table.pug');
 //assumes that champion.json from the most recent patch has been saved in ./resources
 //example URL: https://ddragon.leagueoflegends.com/cdn/13.1.1/data/en_US/champion.json
 export function getChampNames():string[] {
-    let champJson = JSON.parse(fs.readFileSync(`./resources/champion.json`, {encoding: 'utf8'}));
+    let champJson = JSON.parse(fs.readFileSync(`./resources/champion.json`, {encoding: 'utf8'})); //need to update when new champ comes out -- what happens if get json with "nonexistent" champ? error?
     let champNames:string[] = [];
     for (const key in champJson.data) {
         //Inconsistency: Fiddlesticks represented as FiddleSticks in match API data
