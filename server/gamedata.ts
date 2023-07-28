@@ -1,9 +1,6 @@
 import { RiotAPITypes } from '@fightmegg/riot-api/dist/cjs/@types/index';
 import fs = require('node:fs');
 import path = require('node:path');
-import pug = require('pug');
-
-const renderTable = pug.compileFile('table.pug');
 
 //assumes that champion.json from the most recent patch has been saved in ./resources
 //example URL: https://ddragon.leagueoflegends.com/cdn/13.1.1/data/en_US/champion.json
@@ -124,12 +121,6 @@ export class WinrateTable {
                 playerWon ? this.table[champs[i]].addLossAgainst() : this.table[champs[i]].addWinAgainst();
             }
         }
-    }
-    computeTable():string {
-        for (const champ in this.table) {
-            this.table[champ].calculate();
-        }
-        return renderTable({data:this.table});
     }
     static from(obj):WinrateTable {
         for (let champ in obj.table) {

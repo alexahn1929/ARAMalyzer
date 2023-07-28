@@ -242,7 +242,7 @@ async function getProfile(name:string) {
             }
         }); //later add endTime as a param to get all games recursively
         await col.insertOne(wt);
-        return wt.computeTable();
+        return wt;
     }
 }
 
@@ -258,7 +258,7 @@ async function updateProfile(name:string, numGames=3) { //later change name to p
         await bnecks["matchv5"].schedule(getMatch, id).then((game) => wt.logGame(game));
     }
     await col.insertOne(wt);
-    return wt.computeTable();
+    return wt;
 }
 
 async function startServer() {
@@ -273,14 +273,14 @@ async function startServer() {
     });*/
     app.get('/api/get/:summName', async (req, res) => {
         try {
-            res.send(await getProfile(req.params.summName));
+            res.json(await getProfile(req.params.summName));
         }
         catch {
             res.sendStatus(404);
         }
     });
     app.get('/api/update/:summName', async (req, res) => {
-        res.send(await updateProfile(req.params.summName));
+        res.json(await updateProfile(req.params.summName));
     });
 
     app.listen(port, () => {
