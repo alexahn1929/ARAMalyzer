@@ -122,6 +122,11 @@ export class WinrateTable {
             }
         }
     }
+    calculate() {
+        for (const champ in this.table) {
+            this.table[champ].calculate();
+        }
+    }
     static from(obj):WinrateTable {
         for (let champ in obj.table) {
             obj.table[champ] = ChampData.from(obj.table[champ]);

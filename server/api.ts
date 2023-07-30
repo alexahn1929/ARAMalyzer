@@ -8,11 +8,13 @@ import fs = require('node:fs');
 import { WinrateTable, getChampNames } from './gamedata';
 import { RiotRateLimits, LimitGroup } from './ratelimit';
 import express = require('express');
+import cors = require('cors');
 
 const { MongoClient, ServerApiVersion } = require('mongodb');
 
 const app = express();
-const port = 3000;
+app.use(cors());
+const port = 2000;
 
 const API_KEY = process.env.API_KEY;
 const DB_CONN_STRING = process.env.DB_CONN_STRING;
@@ -151,7 +153,7 @@ getMatch('NA1_4573630208').then(x => console.log(getGameEnd(x)));
 
 //rename to analyzeProfile later?
 //inner functions may be slower?
-async function getAllMatches(name:string, numMatches:number):Promise<string> { //returns HTML table. Later make numMatches an optional param
+async function getAllMatches(name:string, numMatches:number):Promise<WinrateTable> { //returns WinrateTable. Later make numMatches an optional param
     //note: couldn't get this to work using matchLimiter.submit (callback method)
     //also works using wrap
 
@@ -163,10 +165,10 @@ async function getAllMatches(name:string, numMatches:number):Promise<string> { /
 
     let playerData = new WinrateTable(puuid, champNames);
 
-    async function getMatchesLimit(endTime:number, remaining:number):Promise<string> {
+    async function getMatchesLimit(endTime:number, remaining:number):Promise<WinrateTable> {
         if (remaining <= 0) {
             console.log('none remaining');
-            return playerData.computeTable();
+            return playerData;
         }
         else {
             let hasMatches = true;
@@ -193,7 +195,7 @@ async function getAllMatches(name:string, numMatches:number):Promise<string> { /
                 }));
             });
             if (!hasMatches) {
-                return playerData.computeTable();
+                return playerData;
             }
             else {
                 if (newEnd === -1) {
@@ -231,7 +233,7 @@ async function getProfile(name:string) {
     let doc = await col.findOne({puuid});
     if (doc !== null) {
         console.log("found");
-        return WinrateTable.from(doc).computeTable();
+        return WinrateTable.from(doc);
     }
     else {
         console.log("not found");
@@ -240,7 +242,7 @@ async function getProfile(name:string) {
             for (let id of ids) {
                 wt.unloggedGames.push(id);
             }
-        }); //later add endTime as a param to get all games recursively
+        }); //later add endTime as a param to get all games recursively (currently only get 100)
         await col.insertOne(wt);
         return wt;
     }
@@ -257,6 +259,7 @@ async function updateProfile(name:string, numGames=3) { //later change name to p
         let id = wt.unloggedGames.pop();
         await bnecks["matchv5"].schedule(getMatch, id).then((game) => wt.logGame(game));
     }
+    wt.calculate();
     await col.insertOne(wt);
     return wt;
 }
@@ -273,6 +276,7 @@ async function startServer() {
     });*/
     app.get('/api/get/:summName', async (req, res) => {
         try {
+            console.log("GET")
             res.json(await getProfile(req.params.summName));
         }
         catch {
@@ -280,6 +284,7 @@ async function startServer() {
         }
     });
     app.get('/api/update/:summName', async (req, res) => {
+        console.log("UPDATE")
         res.json(await updateProfile(req.params.summName));
     });
 
