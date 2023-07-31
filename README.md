@@ -7,10 +7,11 @@ ARAMalyzer's core functionality is a search bar which takes a player's in-game n
 ## Rate Limits
 
 Riot Games' API imposes rate limits upon users to control the frequency of API queries. Currently, the rate limit is such that ARAMalyzer is only able to query an ARAM match roughly once per second.
-As a result, ARAMalyzer presently only returns data from the player's last 5 games. Future commits will seek to implement caching of analyzed data to enable the presentation of data from
-all of a player's recorded ARAM games simultaneously.
+In order to work around this limitation, the ARAMalyzer website live-updates its data tables as the backend receives responses from the Riot API; this feature is observable when you look up an account which has not yet been cached in MongoDB (if you're interested, try searching a random name).
+ARAMalyzer currently only gathers data from a player's last 100 games at the time of their first lookup, as only those match IDs are stored in MongoDB.
+Future commits will seek to present data from all of a player's recorded ARAM games.
 
 ## Implementation
 
-ARAMalyzer is written entirely in TypeScript, and uses the template engine Pug to live-render data tables in HTML format. Data tables are served to the frontend using Express.js.
-API requests are made using Node.js and rate-limited using the package "Bottleneck".
+ARAMalyzer is written entirely in TypeScript, with a React/Next.js frontend (originally written in HTML/CSS/JS with Pug) and a Node.js/Express.js/MongoDB backend.
+Riot Games API requests are rate-limited using the package "Bottleneck".
