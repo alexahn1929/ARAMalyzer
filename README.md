@@ -3,8 +3,8 @@
 ARAMalyzer is a web app that uses Riot Games' API for the popular video game League of Legends to analyze the win rates of champions (playable characters) in the ARAM (All Random All Mid) gamemode.
 In ARAM, all players are assigned a random champion to play, as well as the option to "reroll" to receive another random champion. Players can also trade champions with their teammates.
 ARAMalyzer's core functionality is a search bar which takes a player's in-game name as input and outputs relevant statistics from their ARAM games, grouped by champion.
-<br />
-Riot Games development API keys expire every 24 hours and must be manually renewed via captcha, so the app will appear offline unless I've refreshed my API key in the last 24 hours.
+<br /><br />
+NOTE: Riot Games development API keys expire every 24 hours and must be manually renewed via captcha, so the app will appear offline unless I've refreshed my API key in the last 24 hours.
 
 ## Rate Limits
 
