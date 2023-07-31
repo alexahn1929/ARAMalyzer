@@ -53,9 +53,9 @@ export default function Page({ params } : { params : { summName : string }}) { /
         });
     }, []);
 
-    let content = "";
+    let content = <div id="loader"></div>;
     if (data !== null) {
-        console.log(data);
+        //console.log(data);
         if (errorMsg !== null) {
             content = errorMsg;
         }
