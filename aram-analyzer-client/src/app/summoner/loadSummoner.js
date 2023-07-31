@@ -1,13 +1,13 @@
 function longPoll(summoner) {
     let table = document.getElementById("data");
 
-    fetch("http://alexahn.xyz/api/update/"+summoner).then(async (res) => { //for react: if WRT has no more games to update, stop polling
+    fetch("http://alexahn.xyz/api/update/"+summoner).then(async (res) => { //for react: if WRT has no more games to update, stop polling (set/clear interval)
         if (res.ok) {
             table.outerHTML = await res.text();
             longPoll(summoner);
         }
     });
-}
+};
 
 document.addEventListener('DOMContentLoaded', () => {
     let EXT = "summoner/";
@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
             loader.outerHTML = await res.text();
             setTimeout(() => {longPoll(summoner)}, 3000);
         }
-        else if (res.status == 404) {
+        else if (res.status === 404) {
             loader.outerHTML = "User not found."
         }
         else {
