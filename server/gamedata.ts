@@ -1,6 +1,8 @@
 import { RiotAPITypes } from '@fightmegg/riot-api/dist/cjs/@types/index';
-import fs = require('node:fs');
-import path = require('node:path');
+// import fs = require('node:fs');
+// import path = require('node:path');
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 
 //assumes that champion.json from the most recent patch has been saved in ./resources
 //example URL: https://ddragon.leagueoflegends.com/cdn/13.1.1/data/en_US/champion.json
@@ -56,7 +58,7 @@ class ChampData {
         this.winrateAgainst = this.gamesAgainst > 0 ? (this.winsAgainst/this.gamesAgainst).toLocaleString(undefined,{style: 'percent', maximumFractionDigits:0}) : '';
         this.winrateTotal = this.gamesTotal > 0 ? (this.winsTotal/this.gamesTotal).toLocaleString(undefined,{style: 'percent', maximumFractionDigits:0}) : '';
     }
-    static from(obj):ChampData {
+    static from(obj: Object):ChampData {
         return Object.assign(new ChampData(), obj);
     }
 }
@@ -65,8 +67,8 @@ export class WinrateTable {
     puuid:string;
     table:{[key:string]:ChampData} = {};
     //loggedGames:Set<string> = new Set();
-    startTime; //update during logGame, for tracking what games to be pulled next. set initial value from last index at instantiation time?
-    endTime; //set initial value at instantiation time (getProfile)
+    //startTime:number; //update during logGame, for tracking what games to be pulled next. set initial value from last index at instantiation time?
+    //endTime:number; //set initial value at instantiation time (getProfile)
     unloggedGames:string[] = [];
     constructor(puuid:string, champNames:string[]) {
         /*this.table = champNames.reduce((map:{[key:string]:ChampData}, name) => {
@@ -127,7 +129,7 @@ export class WinrateTable {
             this.table[champ].calculate();
         }
     }
-    static from(obj):WinrateTable {
+    static from(obj: { [key:string]: any }):WinrateTable {
         for (let champ in obj.table) {
             obj.table[champ] = ChampData.from(obj.table[champ]);
         }
