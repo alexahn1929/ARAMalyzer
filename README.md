@@ -7,6 +7,7 @@ ARAMalyzer's core functionality is a search bar which takes a player's in-game n
 ## Rate Limits
 
 Riot Games' API imposes rate limits upon users to control the frequency of API queries. Currently, the rate limit is such that ARAMalyzer is only able to query an ARAM match roughly once per second.
+Additionally, Riot Games development API keys expire every 24 hours and must be manually renewed via captcha, so the app will appear offline unless I've refreshed my API key in the last 24 hours.
 In order to work around this limitation, the ARAMalyzer website live-updates its data tables as the backend receives responses from the Riot API; this feature is observable when you look up an account which has not yet been cached in MongoDB (if you're interested, try searching a random name).
 ARAMalyzer currently only gathers data from a player's last 100 games at the time of their first lookup, as only those match IDs are stored in MongoDB.
 Future commits will seek to present data from all of a player's recorded ARAM games.

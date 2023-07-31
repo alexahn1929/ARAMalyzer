@@ -55,26 +55,24 @@ export default function Page({ params } : { params : { summName : string }}) { /
     let content = <div id="loader"></div>;
     if (dataTable !== null) {
         //console.log(data);
-        if (errorMsg !== null) {
-            content = <div>{errorMsg}</div>;
-        }
-        else {
-            content = (
-                <table>
-                    <thead>
-                        <tr>
-                            <th />
-                            {headerCategories.map((cat, idx) => <th key={idx} colSpan={propertyNames.length}>{cat}</th>)}
-                        </tr>
-                        <tr>
-                            <th>Champion</th>
-                            {headers.map((head, idx) => <th key={idx}>{head}</th>)}
-                        </tr>
-                    </thead>
-                    <tbody>{Object.entries(dataTable.table).map(([champ, champData]) => <Row key={champ} name={champ} data={champData} />)}</tbody>
-                </table>
-            );
-        }
+        content = (
+            <table>
+                <thead>
+                    <tr>
+                        <th />
+                        {headerCategories.map((cat, idx) => <th key={idx} colSpan={propertyNames.length}>{cat}</th>)}
+                    </tr>
+                    <tr>
+                        <th>Champion</th>
+                        {headers.map((head, idx) => <th key={idx}>{head}</th>)}
+                    </tr>
+                </thead>
+                <tbody>{Object.entries(dataTable.table).map(([champ, champData]) => <Row key={champ} name={champ} data={champData} />)}</tbody>
+            </table>
+        );
+    }
+    else if (errorMsg !== null) {
+        content = <div>{errorMsg}</div>;
     }
     return (
         <div className="main">
